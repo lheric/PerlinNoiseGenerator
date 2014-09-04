@@ -9,11 +9,12 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->setupUi(this);
 
     qsrand(QTime::currentTime().msec());
-    m_iHeight = 128;
-    m_iWidth = 128;
-    m_cResult = QImage(m_iWidth, m_iHeight, QImage::Format_RGB32);
+    m_iHeight = 256;
+    m_iWidth = 256;
+    m_cResult = QImage(m_iWidth, m_iHeight, QImage::Format_ARGB32);
     m_cRandomNoise = QImage(m_iWidth, m_iHeight, QImage::Format_RGB32);
     m_cSmoothed = QImage(m_iWidth, m_iHeight, QImage::Format_RGB32);
+
 }
 
 MainWindow::~MainWindow()
@@ -21,7 +22,7 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
-void MainWindow::generateNoise()
+void MainWindow::generateRandomNoise()
 {
     for (int x = 0; x < m_iWidth; x++)
     {
@@ -29,34 +30,15 @@ void MainWindow::generateNoise()
         {
             int iRand = qrand() % 255;
             m_cRandomNoise.setPixel(x,y, qRgb(iRand, iRand, iRand));
-            int iGray = smoothNoise(x/8.0,y/8.0);
-            m_cSmoothed.setPixel(x,y, qRgb(iGray,iGray,iGray));
         }
     }
 
 
 
-    for (int x = 0; x < m_iWidth; x++)
-    {
-        for (int y = 0; y < m_iHeight; y++)
-        {
-            double size = 32.0;
-            double value = 0.0;
-            double initialSize = size;
 
-            while(size >= 1)
-            {
-                value += smoothNoise(x / size, y / size) * size;
-                size /= 2.0;
-            }
-
-            value = value / (initialSize*2);
-            m_cResult.setPixel(x, y, qRgb(value,value,value));
-        }
-    }
 }
 
-double MainWindow::smoothNoise(double x, double y)
+double MainWindow::smoothNoiseInterpolation(double x, double y)
 {
    //get fractional part of x and y
    double fractX = x - int(x);
@@ -81,43 +63,101 @@ double MainWindow::smoothNoise(double x, double y)
 
 }
 
-double MainWindow::turbulence(double x, double y, double size)
-{
-    double value = 0.0, initialSize = size;
+//double MainWindow::turbulence(double x, double y, double size)
+//{
+//    double value = 0.0, initialSize = size;
 
-    while(size >= 1)
-    {
-        value += smoothNoise(x / size, y / size) * size;
-        size /= 2.0;
-    }
-
-    return(128.0 * value / initialSize);
-}
-void MainWindow::generateNoiseImage()
-{
-//    int iSize = 100;
-//    double** ppdGradient = new double*[iSize];
-//    for(int i = 0; i < iSize; i++)
+//    while(size >= 1)
 //    {
-//        ppdGradient[i] = new double[iSize];
-//        for(int j = 0; j < iSize; j++)
-//            ppdGradient[i][j] = 0;
+//        value += smoothNoiseInterpolation(x / size, y / size) * size;
+//        size /= 2.0;
 //    }
 
-//    m_cResult = QPixmap(iSize, iSize);
-//    m_cResult.fill(Qt::red);
+//    return(128.0 * value / initialSize);
+//}
+void MainWindow::displayResult(QLabel* pcLable, QImage& cResult)
+{
+    pcLable->setPixmap(QPixmap::fromImage(cResult));
+    cResult.save(QString("Perlin_Noise_%1x%2.png").arg(m_iWidth).arg(m_iHeight));
+}
 
-//    qsrand(QTime::currentTime().msec());
-//    qDebug() << qrand()%6;
+void MainWindow::getBlendingResult(QImage& cImg)
+{
+    for (int x = 0; x < m_iWidth; x++)
+    {
+        for (int y = 0; y < m_iHeight; y++)
+        {
+            double size = 8.0;
+            double value = 0.0;
+            double initialSize = size;
 
+            while(size >= 1)
+            {
+                value += smoothNoiseInterpolation(x / size, y / size) * size;
+                size /= 2.0;
+            }
 
+            value = value / (initialSize*2);
+            double percent = value/255;
+            double oneMinusPercent = 1-percent;
+            cImg.setPixel(x, y, qRgb(255*percent,255*percent,255*percent));
+        }
+    }
+}
 
-    generateNoise();
+void MainWindow::generateSmoothNoise()
+{
+    for (int x = 0; x < m_iWidth; x++)
+    {
+        for (int y = 0; y < m_iHeight; y++)
+        {
 
-    ui->resultLabel->setPixmap(QPixmap::fromImage(m_cResult));
+            int iGray = smoothNoiseInterpolation(x/8.0,y/8.0);
+            m_cSmoothed.setPixel(x,y, qRgb(iGray,iGray,iGray));
+        }
+    }
 }
 
 void MainWindow::on_runBtn_clicked()
 {
-    this->generateNoiseImage();
+    QImage cPerlinNoise(m_iWidth, m_iHeight, QImage::Format_RGB32);
+    m_acAllWeights.clear();
+    // first
+    this->generateRandomNoise();
+    this->generateSmoothNoise();
+    this->getBlendingResult(cPerlinNoise);
+    this->displayResult(ui->random1, cPerlinNoise);
+    m_acAllWeights.push_back(cPerlinNoise);
+
+    // second
+    this->generateRandomNoise();
+    this->generateSmoothNoise();
+    this->getBlendingResult(cPerlinNoise);
+    this->displayResult(ui->random2, cPerlinNoise);
+    m_acAllWeights.push_back(cPerlinNoise);
+
+    // result
+    QColor cColor1 = QColor(255, 0, 0);
+    QColor cColor2 = QColor(0, 255, 0);
+    QColor cBlending;
+    for(int x = 0; x < m_iWidth; x++)
+    {
+        for(int y = 0; y < m_iHeight; y++)
+        {
+            double dWeight1 = qGray(m_acAllWeights[0].pixel(x,y))/255.0;
+            double dWeight2 = qGray(m_acAllWeights[1].pixel(x,y))/255.0;
+            int r = cColor1.red()*dWeight1 + cColor2.red()*dWeight2;
+            cBlending.setRed(VALUE_CLIP(0, 255, r));
+            int g = cColor1.green()*dWeight1 + cColor2.green()*dWeight2;
+            cBlending.setGreen(VALUE_CLIP(0, 255, g));
+            int b = cColor1.blue()*dWeight1 + cColor2.blue()*dWeight2;
+            cBlending.setBlue(VALUE_CLIP(0, 255, b));
+
+
+            //qDebug() << dWeight1 << dWeight2;
+            m_cResult.setPixel(x, y, cBlending.rgba());
+        }
+    }
+    this->displayResult(ui->resultLabel, m_cResult);
+
 }
