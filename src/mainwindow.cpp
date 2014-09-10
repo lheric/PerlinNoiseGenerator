@@ -87,7 +87,7 @@ void MainWindow::getBlendingResult(QImage& cImg)
     {
         for (int y = 0; y < m_iHeight; y++)
         {
-            double size = 8.0;
+            double size = 32.0;
             double value = 0.0;
             double initialSize = size;
 
