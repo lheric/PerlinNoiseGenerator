@@ -50,7 +50,7 @@
        </widget>
       </item>
       <item>
-       <widget class="QLabel" name="label">
+       <widget class="QLabel" name="random3">
         <property name="text">
          <string>TextLabel</string>
         </property>

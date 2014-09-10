@@ -2,6 +2,7 @@
 #include "ui_mainwindow.h"
 #include <QDebug>
 #include <QTime>
+#include <QVector3D>
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
@@ -37,6 +38,29 @@ void MainWindow::generateRandomNoise()
 
 
 }
+
+QColor MainWindow::ryb2rgb(float inR, float inY, float inB)
+{
+    QVector3D f000(1.0,     1.0,        1.0);
+    QVector3D f001(0.163,   0.373,      0.6);
+    QVector3D f010(1.0,     1.0,        0.0);
+    QVector3D f011(0.0,     0.66,       0.2);
+    QVector3D f100(1.0,     0.0,        0.0);
+    QVector3D f101(0.5,     0.5,        0.0);
+    QVector3D f110(1.0,     0.5,        0.0);
+    QVector3D f111(0.2,     0.094,      0.0);
+    float oneMinusR = 1-inR;
+    float oneMinusY = 1-inY;
+    float oneMinusB = 1-inB;
+    QVector3D rgb = f000*oneMinusR*oneMinusY*oneMinusB + f001*oneMinusR*oneMinusY*inB
+                    + f010*oneMinusR*inY*oneMinusB + f100*inR*oneMinusY*oneMinusB +
+                    f011*oneMinusR*inY*inB + f101*inR*oneMinusY*inB +
+                    f110*inR*inY*oneMinusB + f111*inR*inY*inB;
+
+    rgb *= 255;
+    return QColor(rgb.x(), rgb.y(), rgb.z());
+}
+
 
 double MainWindow::smoothNoiseInterpolation(double x, double y)
 {
@@ -136,9 +160,17 @@ void MainWindow::on_runBtn_clicked()
     this->displayResult(ui->random2, cPerlinNoise);
     m_acAllWeights.push_back(cPerlinNoise);
 
+    // third
+    this->generateRandomNoise();
+    this->generateSmoothNoise();
+    this->getBlendingResult(cPerlinNoise);
+    this->displayResult(ui->random3, cPerlinNoise);
+    m_acAllWeights.push_back(cPerlinNoise);
+
     // result
-    QColor cColor1 = QColor(255, 0, 0);
-    QColor cColor2 = QColor(0, 255, 0);
+    QColor cColor1 = QColor(255, 0, 0); //r
+    QColor cColor2 = QColor(0, 255, 0); //y
+    QColor cColor3 = QColor(0, 0, 255); //b
     QColor cBlending;
     for(int x = 0; x < m_iWidth; x++)
     {
@@ -146,16 +178,18 @@ void MainWindow::on_runBtn_clicked()
         {
             double dWeight1 = qGray(m_acAllWeights[0].pixel(x,y))/255.0;
             double dWeight2 = qGray(m_acAllWeights[1].pixel(x,y))/255.0;
-            int r = cColor1.red()*dWeight1 + cColor2.red()*dWeight2;
-            cBlending.setRed(VALUE_CLIP(0, 255, r));
-            int g = cColor1.green()*dWeight1 + cColor2.green()*dWeight2;
-            cBlending.setGreen(VALUE_CLIP(0, 255, g));
-            int b = cColor1.blue()*dWeight1 + cColor2.blue()*dWeight2;
-            cBlending.setBlue(VALUE_CLIP(0, 255, b));
+            double dWeight3 = qGray(m_acAllWeights[2].pixel(x,y))/255.0;
+            m_cResult.setPixel(x, y, ryb2rgb(dWeight1, dWeight2, dWeight3).rgb());
+//            int r = cColor1.red()*dWeight1 + cColor2.red()*dWeight2;
+//            cBlending.setRed(VALUE_CLIP(0, 255, r));
+//            int g = cColor1.green()*dWeight1 + cColor2.green()*dWeight2;
+//            cBlending.setGreen(VALUE_CLIP(0, 255, g));
+//            int b = cColor1.blue()*dWeight1 + cColor2.blue()*dWeight2;
+//            cBlending.setBlue(VALUE_CLIP(0, 255, b));
 
 
             //qDebug() << dWeight1 << dWeight2;
-            m_cResult.setPixel(x, y, cBlending.rgba());
+//            m_cResult.setPixel(x, y, cBlending.rgba());
         }
     }
     this->displayResult(ui->resultLabel, m_cResult);

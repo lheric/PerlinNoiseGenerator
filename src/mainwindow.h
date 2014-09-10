@@ -26,6 +26,7 @@ public:
     double smoothNoiseInterpolation(double x, double y);
     //double turbulence(double x, double y, double size);
     void generateRandomNoise();
+    QColor ryb2rgb(float inR, float inY, float inB);
 private slots:
     void on_runBtn_clicked();
 
