@@ -18,6 +18,12 @@ MainWindow::MainWindow(QWidget *parent) :
     m_cRandomNoise = QImage(m_iWidth, m_iHeight, QImage::Format_RGB32);
     m_cSmoothed = QImage(m_iWidth, m_iHeight, QImage::Format_RGB32);
 
+
+    cColor1 = QVector3D(1.0, 0.0, 0.0); //r
+    cColor2 = QVector3D(0.0, 1.0, 0.0); //y
+    cColor3 = QVector3D(0.0, 0.0, 1.0); //b
+    cColor4 = QVector3D(0.3, 0.5, 0.0); //1
+    cColor5 = QVector3D(0.5, 0.3, 0.1); //2
 }
 
 MainWindow::~MainWindow()
@@ -60,7 +66,11 @@ QColor MainWindow::ryb2rgb(float inR, float inY, float inB)
                     f110*inR*inY*oneMinusB + f111*inR*inY*inB;
 
     rgb *= 255;
-    return QColor(rgb.x(), rgb.y(), rgb.z());
+
+    float outR = qMax(0, qMin(int(rgb.x()), 255));
+    float outG = qMax(0, qMin(int(rgb.y()), 255));
+    float outB = qMax(0, qMin(int(rgb.z()), 255));
+    return QColor(outR, outG, outB);
 }
 
 
@@ -101,19 +111,39 @@ double MainWindow::smoothNoiseInterpolation(double x, double y)
 
 //    return(128.0 * value / initialSize);
 //}
-void MainWindow::displayResult(QLabel* pcLable, QImage& cResult)
+void MainWindow::displayResult(QLabel* pcLable, QImage& cResult, QVector3D cRYB)
 {
-    pcLable->setPixmap(QPixmap::fromImage(cResult));
+    QImage cColorImage(cResult);
+    QVector3D cWeightColor;
+    for(int x = 0; x < cResult.width(); x++)
+    {
+        for(int y = 0; y < cResult.height(); y++)
+        {
+            cWeightColor = cRYB * qGray(cResult.pixel(x,y))/255.0;
+            QColor rgb = ryb2rgb(cWeightColor.x(), cWeightColor.y(), cWeightColor.z());
+            cColorImage.setPixel(x,y, rgb.rgb());
+        }
+    }
+    pcLable->setPixmap(QPixmap::fromImage(cColorImage));
+
     //cResult.save(QString("Perlin_Noise_%1x%2.png").arg(m_iWidth).arg(m_iHeight));
 }
 
-void MainWindow::getBlendingResult(QImage& cImg)
+void MainWindow::displayResult(QLabel* pcLable, QImage& cResult)
+{
+    pcLable->setPixmap(QPixmap::fromImage(cResult));
+
+    //cResult.save(QString("Perlin_Noise_%1x%2.png").arg(m_iWidth).arg(m_iHeight));
+}
+
+
+void MainWindow::getBlendingResult(QImage& cImg, double dDensity)
 {
     for (int x = 0; x < m_iWidth; x++)
     {
         for (int y = 0; y < m_iHeight; y++)
         {
-            double size = 5.0;
+            double size = dDensity;
             double value = 0.0;
             double initialSize = size;
 
@@ -146,6 +176,91 @@ void MainWindow::generateSmoothNoise()
 
 void MainWindow::on_runBtn_clicked()
 {
+
+
+    QImage cPerlinNoise(m_iWidth, m_iHeight, QImage::Format_RGB32);
+
+
+    double dDensity = ui->densityLineEdit->text().toFloat();
+    double dPro1 = ui->weightRed->text().toFloat();
+    double dPro2 = ui->weightYellow->text().toFloat();
+    double dPro3 = ui->weightBlue->text().toFloat();
+    double dPro4 = ui->weightAdd1->text().toFloat();
+    double dPro5 = ui->weightAdd2->text().toFloat();
+
+    m_acAllWeights.clear();
+    // first
+    this->generateRandomNoise();
+    this->generateSmoothNoise();
+    this->getBlendingResult(cPerlinNoise, dDensity);
+    this->displayResult(ui->random1, cPerlinNoise, cColor1);
+    m_acAllWeights.push_back(cPerlinNoise);
+
+    // second
+    this->generateRandomNoise();
+    this->generateSmoothNoise();
+    this->getBlendingResult(cPerlinNoise, dDensity);
+    this->displayResult(ui->random2, cPerlinNoise, cColor2);
+    m_acAllWeights.push_back(cPerlinNoise);
+
+    // third
+    this->generateRandomNoise();
+    this->generateSmoothNoise();
+    this->getBlendingResult(cPerlinNoise, dDensity);
+    this->displayResult(ui->random3, cPerlinNoise, cColor3);
+    m_acAllWeights.push_back(cPerlinNoise);
+
+    // forth
+    this->generateRandomNoise();
+    this->generateSmoothNoise();
+    this->getBlendingResult(cPerlinNoise, dDensity);
+    this->displayResult(ui->random4, cPerlinNoise, cColor4);
+    m_acAllWeights.push_back(cPerlinNoise);
+
+    // fifth
+    this->generateRandomNoise();
+    this->generateSmoothNoise();
+    this->getBlendingResult(cPerlinNoise, dDensity);
+    this->displayResult(ui->random5, cPerlinNoise, cColor5);
+    m_acAllWeights.push_back(cPerlinNoise);
+
+    QVector3D cBlending;
+    for(int x = 0; x < m_iWidth; x++)
+    {
+        for(int y = 0; y < m_iHeight; y++)
+        {
+            double dWeight1 = qGray(m_acAllWeights[0].pixel(x,y))*dPro1/255.0;
+            double dWeight2 = qGray(m_acAllWeights[1].pixel(x,y))*dPro2/255.0;
+            double dWeight3 = qGray(m_acAllWeights[2].pixel(x,y))*dPro3/255.0;
+            double dWeight4 = qGray(m_acAllWeights[3].pixel(x,y))*dPro4/255.0;
+            double dWeight5 = qGray(m_acAllWeights[4].pixel(x,y))*dPro5/255.0;
+
+            cBlending = cColor1*dWeight1 + cColor2*dWeight2 + cColor3*dWeight3 + cColor4*dWeight4 + cColor5*dWeight5;
+            m_cResult.setPixel(x, y, ryb2rgb(cBlending.x(), cBlending.y(), cBlending.z()).rgb());
+            //            int r = cColor1.red()*dWeight1 + cColor2.red()*dWeight2;
+            //            cBlending.setRed(VALUE_CLIP(0, 255, r));
+            //            int g = cColor1.green()*dWeight1 + cColor2.green()*dWeight2;
+            //            cBlending.setGreen(VALUE_CLIP(0, 255, g));
+            //            int b = cColor1.blue()*dWeight1 + cColor2.blue()*dWeight2;
+            //            cBlending.setBlue(VALUE_CLIP(0, 255, b));
+
+
+            //qDebug() << dWeight1 << dWeight2;
+            //            m_cResult.setPixel(x, y, cBlending.rgba());
+        }
+    }
+    m_cResult.save(QString("single_%1_%2_%3.png")
+                   .arg(dPro1, 0, 'f', 1)
+                   .arg(dPro2, 0, 'f', 1)
+                   .arg(dPro3, 0, 'f', 1));
+
+
+    this->displayResult(ui->resultLabel, m_cResult);
+
+}
+
+void MainWindow::on_readFileAndRunBtn_clicked()
+{
     QFile cFile("proportion_data_33.txt");
     if( !cFile.open(QIODevice::ReadOnly) )
     {
@@ -155,6 +270,7 @@ void MainWindow::on_runBtn_clicked()
 
 
     QTextStream cInWeight(&cFile);
+    double dDensity = ui->densityLineEdit->text().toFloat();
 
     QImage cPerlinNoise(m_iWidth, m_iHeight, QImage::Format_RGB32);
     int iLineNum = 0;
@@ -172,29 +288,25 @@ void MainWindow::on_runBtn_clicked()
         // first
         this->generateRandomNoise();
         this->generateSmoothNoise();
-        this->getBlendingResult(cPerlinNoise);
+        this->getBlendingResult(cPerlinNoise, dDensity);
         this->displayResult(ui->random1, cPerlinNoise);
         m_acAllWeights.push_back(cPerlinNoise);
 
         // second
         this->generateRandomNoise();
         this->generateSmoothNoise();
-        this->getBlendingResult(cPerlinNoise);
+        this->getBlendingResult(cPerlinNoise, dDensity);
         this->displayResult(ui->random2, cPerlinNoise);
         m_acAllWeights.push_back(cPerlinNoise);
 
         // third
         this->generateRandomNoise();
         this->generateSmoothNoise();
-        this->getBlendingResult(cPerlinNoise);
+        this->getBlendingResult(cPerlinNoise, dDensity);
         this->displayResult(ui->random3, cPerlinNoise);
         m_acAllWeights.push_back(cPerlinNoise);
 
         // result
-        QColor cColor1 = QColor(255, 0, 0); //r
-        QColor cColor2 = QColor(0, 255, 0); //y
-        QColor cColor3 = QColor(0, 0, 255); //b
-        QColor cBlending;
         for(int x = 0; x < m_iWidth; x++)
         {
             for(int y = 0; y < m_iHeight; y++)
@@ -203,16 +315,6 @@ void MainWindow::on_runBtn_clicked()
                 double dWeight2 = qGray(m_acAllWeights[1].pixel(x,y))*dPro2/255.0;
                 double dWeight3 = qGray(m_acAllWeights[2].pixel(x,y))*dPro3/255.0;
                 m_cResult.setPixel(x, y, ryb2rgb(dWeight1, dWeight2, dWeight3).rgb());
-    //            int r = cColor1.red()*dWeight1 + cColor2.red()*dWeight2;
-    //            cBlending.setRed(VALUE_CLIP(0, 255, r));
-    //            int g = cColor1.green()*dWeight1 + cColor2.green()*dWeight2;
-    //            cBlending.setGreen(VALUE_CLIP(0, 255, g));
-    //            int b = cColor1.blue()*dWeight1 + cColor2.blue()*dWeight2;
-    //            cBlending.setBlue(VALUE_CLIP(0, 255, b));
-
-
-                //qDebug() << dWeight1 << dWeight2;
-    //            m_cResult.setPixel(x, y, cBlending.rgba());
             }
         }
         m_cResult.save(QString("#%1_%2_%3_%4.png").arg(iLineNum)
@@ -224,5 +326,4 @@ void MainWindow::on_runBtn_clicked()
         qDebug() << "#" << iLineNum << "line finished";
     }
     this->displayResult(ui->resultLabel, m_cResult);
-
 }
