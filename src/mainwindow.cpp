@@ -49,21 +49,23 @@ void MainWindow::generateRandomNoise()
 
 QColor MainWindow::ryb2rgb(float inR, float inY, float inB)
 {
-    QVector3D f000(1.0,     1.0,        1.0);
-    QVector3D f001(0.163,   0.373,      0.6);
-    QVector3D f010(1.0,     1.0,        0.0);
-    QVector3D f011(0.0,     0.66,       0.2);
-    QVector3D f100(1.0,     0.0,        0.0);
-    QVector3D f101(0.5,     0.5,        0.0);
-    QVector3D f110(1.0,     0.5,        0.0);
-    QVector3D f111(0.2,     0.094,      0.0);
+
+    const static QVector3D f000(1.0,     1.0,        1.0);
+    const static QVector3D f001(0.163,   0.373,      0.6);
+    const static QVector3D f010(1.0,     1.0,        0.0);
+    const static QVector3D f011(0.0,     0.66,       0.2);
+    const static QVector3D f100(1.0,     0.0,        0.0);
+    const static QVector3D f101(0.5,     0.5,        0.0);
+    const static QVector3D f110(1.0,     0.5,        0.0);
+    const static QVector3D f111(0.2,     0.094,      0.0);
     float oneMinusR = 1-inR;
     float oneMinusY = 1-inY;
     float oneMinusB = 1-inB;
-    QVector3D rgb = f000*oneMinusR*oneMinusY*oneMinusB + f001*oneMinusR*oneMinusY*inB
-                    + f010*oneMinusR*inY*oneMinusB + f100*inR*oneMinusY*oneMinusB +
-                    f011*oneMinusR*inY*inB + f101*inR*oneMinusY*inB +
-                    f110*inR*inY*oneMinusB + f111*inR*inY*inB;
+    static QVector3D rgb;
+    rgb = f000*oneMinusR*oneMinusY*oneMinusB + f001*oneMinusR*oneMinusY*inB
+            + f010*oneMinusR*inY*oneMinusB + f100*inR*oneMinusY*oneMinusB +
+            f011*oneMinusR*inY*inB + f101*inR*oneMinusY*inB +
+            f110*inR*inY*oneMinusB + f111*inR*inY*inB;
 
     rgb *= 255;
 
@@ -261,10 +263,11 @@ void MainWindow::on_runBtn_clicked()
 
 void MainWindow::on_readFileAndRunBtn_clicked()
 {
-    QFile cFile("proportion_data_33.txt");
+    QString strFilepath = this->ui->filePathLineEdit->text();
+    QFile cFile(strFilepath);
     if( !cFile.open(QIODevice::ReadOnly) )
     {
-        qDebug() << "Not Found";
+        qDebug() << QString("File Not Found: %1").arg(strFilepath);
         return;
     }
 
@@ -276,7 +279,13 @@ void MainWindow::on_readFileAndRunBtn_clicked()
     int iLineNum = 0;
     while( !cInWeight.atEnd() )
     {
+        iLineNum++;
         QStringList strLine = cInWeight.readLine().trimmed().split(QRegExp("\\s+"), QString::SkipEmptyParts);
+        if(strLine.isEmpty())
+        {
+            qDebug() << "#" << iLineNum << "line is empty";
+            continue;
+        }
         //qDebug() << strLine;
         Q_ASSERT(strLine.size() == 3);
         double dPro1 = strLine[0].toFloat();
@@ -317,13 +326,15 @@ void MainWindow::on_readFileAndRunBtn_clicked()
                 m_cResult.setPixel(x, y, ryb2rgb(dWeight1, dWeight2, dWeight3).rgb());
             }
         }
-        m_cResult.save(QString("#%1_%2_%3_%4.png").arg(iLineNum)
-                       .arg(dPro1, 0, 'f', 1)
-                       .arg(dPro2, 0, 'f', 1)
-                       .arg(dPro3, 0, 'f', 1));
 
-        iLineNum++;
+//        m_cResult.save(QString("#%1_%2_%3_%4.png").arg(iLineNum)
+//                       .arg(dPro1, 0, 'f', 1)
+//                       .arg(dPro2, 0, 'f', 1)
+//                       .arg(dPro3, 0, 'f', 1));
+        m_cResult.save(QString("#%1.jpg").arg(iLineNum));
+
+
         qDebug() << "#" << iLineNum << "line finished";
     }
-    this->displayResult(ui->resultLabel, m_cResult);
+    //this->displayResult(ui->resultLabel, m_cResult);
 }
